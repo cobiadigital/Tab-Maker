@@ -10,9 +10,11 @@ from .text import song_to_plain_lines
 try:  # pragma: no cover - optional dependency
     from docx import Document
     from docx.shared import Pt
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
 except Exception:  # pragma: no cover
     Document = None  # type: ignore
     Pt = None  # type: ignore
+    WD_ALIGN_PARAGRAPH = None  # type: ignore
 
 
 def _ensure_docx_available() -> None:
@@ -29,6 +31,31 @@ def song_to_docx(song: Song, destination: Union[str, Path]) -> Path:
 
     document = Document()
     metadata = song.metadata
+
+    title = metadata.get("title")
+    artist = metadata.get("artist")
+    if title and artist:
+        header_text = f"{title} - {artist}"
+    else:
+        header_text = title or artist
+
+    if header_text:
+        section = document.sections[0]
+        header = section.header
+        paragraph = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+        paragraph.text = ""
+        try:
+            paragraph.style = document.styles["Title"]
+        except KeyError:
+            pass
+        run = paragraph.add_run(header_text)
+        run.bold = True
+        run.font.name = "Courier New"
+        if Pt is not None:
+            run.font.size = Pt(16)
+        if WD_ALIGN_PARAGRAPH is not None:
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
     if "title" in metadata:
         document.core_properties.title = metadata["title"]
     if "artist" in metadata:

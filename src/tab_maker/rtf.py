@@ -33,10 +33,42 @@ def lines_to_rtf(lines: Iterable[str]) -> str:
 def segments_to_rtf(segments: Sequence[RenderSegment]) -> str:
     """Render annotated two-line segments to RTF with chord formatting."""
     parts: List[str] = [_RTF_HEADER]
+    title_text: str | None = None
+    artist_text: str | None = None
+    skip_indices: set[int] = set()
+
+    idx = 0
+    while idx < len(segments) and segments[idx].kind == "metadata":
+        raw_text = segments[idx].text
+        lowered = raw_text.lower()
+        if lowered.startswith("title:"):
+            value = raw_text.split(":", 1)[1].strip()
+            if value:
+                title_text = value
+                skip_indices.add(idx)
+        elif lowered.startswith("artist:"):
+            value = raw_text.split(":", 1)[1].strip()
+            if value:
+                artist_text = value
+                skip_indices.add(idx)
+        idx += 1
+
+    if title_text or artist_text:
+        header_style = r"\pard\plain\qc\b\f0\fs32 "
+        if title_text:
+            parts.append(f"{header_style}{_escape_rtf(title_text)}\\par")
+        if artist_text:
+            parts.append(f"{header_style}{_escape_rtf(artist_text)}\\par")
+        parts.append("\\pard\\f0\\fs22 ")
+
     idx = 0
     started = False
 
     while idx < len(segments):
+        if idx in skip_indices:
+            idx += 1
+            continue
+
         segment = segments[idx]
         kind = segment.kind
 
@@ -91,9 +123,9 @@ def segments_to_rtf(segments: Sequence[RenderSegment]) -> str:
     parts.append(_RTF_FOOTER)
     return "\n".join(parts)
 
-
 def song_to_rtf(song: Song) -> str:
     return lines_to_rtf(song_to_plain_lines(song))
 
 
 __all__ = ["song_to_rtf", "lines_to_rtf", "segments_to_rtf"]
+
